@@ -1,0 +1,213 @@
+{
+----------------------------------------------------------------------------------------------------
+    Filename:       input.touchscreen.ft5x26.spin
+    Description:    Driver for the FT5x26 capacitive touchscreen
+    Author:         Jesse Burt
+    Started:        Mar 3, 2025
+    Updated:        Mar 3, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
+}
+{Spin2_v46}
+#include "input.pointer.common.spin2h"
+
+
+con
+
+    ' default I/O configuration
+    SCL         = 0
+    SDA         = 1
+    I2C_FREQ    = 100_000
+
+    WIDTH       = 128
+    HEIGHT      = 64
+
+
+    MAX_POINTERS= 5
+
+    struct touch_s(...
+        byte    event, ...      'b7..6 of X-position
+        word    x, y, ...       'b3..0 (H), b7..0 (L)
+        byte    id, ...         'b7..4 of Y-position
+        byte    weight, ...
+        byte    area)           'b7..4
+
+
+obj
+
+    i2c:    "com.i2c"
+    core:   "core.con.ft5x26"
+
+
+var
+
+    byte        _slave_addr_w, _slave_addr_r
+
+    touch_s     pointer[MAX_POINTERS]
+
+    byte        _x_event
+    byte        _touch_id
+    byte        _invert
+    byte        _points_active
+
+
+pub start(): s
+' Start the driver using default I/O settings
+	return startx(SCL, SDA, I2C_FREQ, WIDTH, HEIGHT)
+
+
+pub startx(SCL_PIN, SDA_PIN, I2C_HZ, TS_WIDTH, TS_HEIGHT): s
+' Start the driver using custom I/O settings
+'   SCL_PIN:            I2C Serial Clock, 0..63
+'   SDA_PIN:            I2C Serial Data, 0..63
+'   I2C_HZ:             I2C bus speed
+'   TS_WIDTH, TS_HIGHT: touchscreen dimensions, in pixels
+'   Returns:
+'       cog ID+1 of I2C engine on success (= calling cog ID+1, if the bytecode I2C engine is used)
+'       0 on failure
+    s := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ)
+    waitus(core.TRST)
+    set_abs_x_max(TS_WIDTH-1)
+    set_abs_y_max(TS_HEIGHT-1)
+    _slave_addr_w := core.SLAVE_ADDR
+    _slave_addr_r := core.SLAVE_ADDR|1
+    if ( i2c.present(core.SLAVE_ADDR) )
+        return s
+    else
+        return 0
+
+
+pub stop()
+' Stop the driver
+    i2c.deinit()
+
+
+con
+
+    ' gestures
+    NO_GESTURE  = $00
+    MOVE_UP     = $10
+    MOVE_RIGHT  = $14
+    MOVE_DOWN   = $18
+    MOVE_LEFT   = $1c
+    ZOOM_IN     = $48
+    ZOOM_OUT    = $49
+
+pub gesture(): g
+' Get last recognized gesture
+    return readreg(core.GEST_ID)
+
+
+pub invert(i)
+' Invert returned touch coordinates
+    _invert := i
+
+
+pub opmode(m)
+' Set device operating mode
+'   m:
+'       non-zero:   normal working mode
+'       zero:       test mode
+    if ( m )
+        m := core.WORKING_MODE
+    else
+        m := core.TEST_MODE
+
+    i2c.start()
+    i2c.write(_slave_addr_w)
+    i2c.write(core.MODE_SWITCH)
+    i2c.write(m)
+    i2c.stop()
+
+
+pub read_touch_events(): s | n, t, byte tmp[6]
+' Read a touchscreen structure into RAM
+    _points_active := n := readreg(core.TD_STATUS)
+    if ( (n == 0) or (n > MAX_POINTERS) )
+        return false
+
+    bytefill(@tmp, 0, 6)
+
+    repeat t from 0 to n-1
+        i2c.start()
+        i2c.write(_slave_addr_w)
+        i2c.write( (t * 6)+3 )                  ' calc register base based on touch #
+        i2c.start()
+        i2c.write(_slave_addr_r)
+        i2c.rdblock_lsbf(@tmp, 6, i2c.NAK)
+        i2c.stop()
+
+        pointer[t].event :=     (tmp[0] >> core.TOUCH_EVT_FLAG) & core.TOUCH_EVT_FLAG_BITS
+        pointer[t].x :=         (tmp[0] & core.TOUCH_XPOS_H_BITS) << 8 | tmp[1]
+        pointer[t].id :=        (tmp[2] >> core.TOUCH_ID) & core.TOUCH_ID_BITS
+        pointer[t].y :=         (tmp[2] & core.TOUCH_YPOS_H_BITS) << 8 | tmp[3]
+        pointer[t].weight :=    tmp[4]
+        pointer[t].area :=      (tmp[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
+
+
+
+pub touch_area(t=0): a
+' Get the area of the detected touch point
+    return pointer[t].area
+
+
+pub touch_points(): p
+' Get the number of detected touch points
+    return _points_active
+
+
+pub touch_x(t=0): x
+' Get touchscreen X-coordinate
+    return pointer[t].x
+
+
+pub touch_y(t=0): y
+' Get touchscreen Y-coordinate
+    return pointer[t].y
+
+
+pub touch_weight(t=0): w
+' Get weight of detected touch
+    return pointer[t].weight
+
+
+pri readreg(reg_nr, len=1): v
+' Read register
+'   reg_nr:     register number
+'   len:        length of data/number of consecutive registers to read (default: 2)
+'   Returns:    register value
+    v := 0
+    i2c.start()
+    i2c.write(_slave_addr_w)
+    i2c.write(reg_nr)
+    i2c.start()
+    i2c.write(_slave_addr_r)
+    i2c.rdblock_msbf(@v, 1 #> len <# 4, i2c.NAK)
+    i2c.stop()
+
+
+pri touchnum_to_reg(t): r
+' Convert touch number to register base
+    return (t * 6)+3
+
+
+DAT
+{
+Copyright (c) 2025 Jesse Burt
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+}
+
