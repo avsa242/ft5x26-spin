@@ -22,8 +22,12 @@ con
     HEIGHT      = 64
 
 
-    MAX_POINTERS= 5
+    ' limits
+    MAX_POINTERS= 10
+    SLAVE_ADDR_W= core.SLAVE_ADDR
+    SLAVE_ADDR_R= SLAVE_ADDR_W | 1
 
+    ' touch event structure
 	touch_s(...
         byte	event, ...		'b7..6 of X-position
         word	x, y, ...		'b3..0 (H), b7..0 (L)
@@ -41,12 +45,8 @@ obj
 
 var
 
-	byte 		_slave_addr_w, _slave_addr_r
-
 	touch_s		pointer[MAX_POINTERS]
 
-	byte 		_x_event
-	byte 		_touch_id
     byte        _invert
     byte        _points_active
 
@@ -65,12 +65,18 @@ pub startx(SCL_PIN, SDA_PIN, I2C_HZ, TS_WIDTH, TS_HEIGHT): s
 '   Returns:
 '       cog ID+1 of I2C engine on success (= calling cog ID+1, if the bytecode I2C engine is used)
 '       0 on failure
-	s := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ)
-	time.usleep(core.TRST)
-	set_abs_x_max(TS_WIDTH-1)
-	set_abs_y_max(TS_HEIGHT-1)
-    _slave_addr_w := core.SLAVE_ADDR
-    _slave_addr_r := core.SLAVE_ADDR|1
+    if ( lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) )
+        s := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ)
+        time.usleep(core.TRST)
+        set_abs_x_max(TS_WIDTH-1)
+        set_abs_y_max(TS_HEIGHT-1)
+
+        if ( i2c.present(core.SLAVE_ADDR) )
+            return
+    ' if this point is reached, something above failed
+    ' Double check I/O pin assignments, connections, power
+    ' Lastly - make sure you have at least one free core/cog
+    return false
 
 
 pub stop()
@@ -110,7 +116,7 @@ pub opmode(m)
         m := core.TEST_MODE
 
     i2c.start()
-    i2c.write(_slave_addr_w)
+    i2c.write(SLAVE_ADDR_W)
     i2c.write(core.MODE_SWITCH)
     i2c.write(m)
     i2c.stop()
@@ -125,11 +131,13 @@ pub read_touch_events(): s | n, t, byte tmp[6]
     bytefill(@tmp, 0, 6)
 
     repeat t from 0 to n-1
+        ' read the entire touch register structure (6 regs per touch, starting with
+        '   $03 for touch point #1)
         i2c.start()
-        i2c.write(_slave_addr_w)
-        i2c.write( (t * 6)+3 )                  ' calc register base based on touch #
+        i2c.write(SLAVE_ADDR_W)
+        i2c.write( (t * 6)+$03 )                ' calc register base based on touch #
         i2c.start()
-        i2c.write(_slave_addr_r)
+        i2c.write(SLAVE_ADDR_R)
         i2c.rdblock_lsbf(@tmp, 6, i2c.NAK)
         i2c.stop()
 
@@ -139,7 +147,6 @@ pub read_touch_events(): s | n, t, byte tmp[6]
         pointer[t].y :=         (tmp[2] & core.TOUCH_YPOS_H_BITS) << 8 | tmp[3]
         pointer[t].weight :=    tmp[4]
         pointer[t].area :=      (tmp[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
-
 
 
 pub touch_area(t=0): a
@@ -154,12 +161,18 @@ pub touch_points(): p
 
 pub touch_x(t=0): x
 ' Get touchscreen X-coordinate
-    return pointer[t].x
+    if ( _invert )
+        return _pointer_x_max-pointer[t].x
+    else
+        return pointer[t].x
 
 
 pub touch_y(t=0): y
 ' Get touchscreen Y-coordinate
-    return pointer[t].y
+    if ( _invert )
+        return _pointer_y_max-pointer[t].y
+    else
+        return pointer[t].y
 
 
 pub touch_weight(t=0): w
@@ -170,14 +183,14 @@ pub touch_weight(t=0): w
 pri readreg(reg_nr, len=1): v
 ' Read register
 '   reg_nr:     register number
-'   len:        length of data/number of consecutive registers to read (default: 2)
+'   len:        length of data/number of consecutive registers to read (default: 1)
 '   Returns:    register value
     v := 0
     i2c.start()
-    i2c.write(_slave_addr_w)
+    i2c.write(SLAVE_ADDR_W)
     i2c.write(reg_nr)
     i2c.start()
-    i2c.write(_slave_addr_r)
+    i2c.write(SLAVE_ADDR_R)
     i2c.rdblock_msbf(@v, 1 #> len <# 4, i2c.NAK)
     i2c.stop()
 
