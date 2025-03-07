@@ -31,8 +31,8 @@ con
 
 obj
 
-    i2c:    "com.i2c"
-    core:   "core.con.ft5x26"
+    i2c:    "com.i2c"                           ' I2C engine
+    core:   "core.con.ft5x26"                   ' hw-specific constants
 
 
 var
@@ -45,7 +45,7 @@ var
 
 pub start(): s
 ' Start the driver using default I/O settings
-	return startx(SCL, SDA, I2C_FREQ, WIDTH, HEIGHT)
+    return startx(SCL, SDA, I2C_FREQ, WIDTH, HEIGHT)
 
 
 pub startx(SCL_PIN, SDA_PIN, I2C_HZ, TS_WIDTH, TS_HEIGHT): s
