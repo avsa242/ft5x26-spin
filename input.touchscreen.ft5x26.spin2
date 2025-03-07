@@ -9,7 +9,7 @@
 ----------------------------------------------------------------------------------------------------
 }
 {Spin2_v46}
-#include "input.pointer.common.spin2h"
+#include "input.pointer.common.spin2h"          ' use code common to all pointing devices
 
 
 con
@@ -28,14 +28,6 @@ con
     SLAVE_ADDR_W= core.SLAVE_ADDR
     SLAVE_ADDR_R= SLAVE_ADDR_W | 1
 
-    ' touch event structure
-    struct touch_s(...
-        byte    event, ...      'b7..6 of X-position
-        word    x, y, ...       'b3..0 (H), b7..0 (L)
-        byte    id, ...         'b7..4 of Y-position
-        byte    weight, ...
-        byte    area)           'b7..4
-
 
 obj
 
@@ -47,8 +39,8 @@ var
 
     touch_s     pointer[MAX_POINTERS]
 
-    byte        _invert
-    byte        _points_active
+    byte        _invert                         ' x,y coordinates invert flag
+    byte        _points_active                  ' number of active touch points
 
 
 pub start(): s
@@ -147,6 +139,8 @@ pub read_touch_events(): s | n, t, byte tmp[6]
         pointer[t].y :=         (tmp[2] & core.TOUCH_YPOS_H_BITS) << 8 | tmp[3]
         pointer[t].weight :=    tmp[4]
         pointer[t].area :=      (tmp[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
+
+    return n
 
 
 pub touch_area(t=0): a

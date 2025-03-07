@@ -8,15 +8,15 @@
     Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
-#include "input.pointer.common.spinh"
+#include "input.pointer.common.spinh"           ' use code common to all pointing devices
 
 
 con
 
-	' default I/O configuration
-	SCL			= 28
-	SDA			= 29
-	I2C_FREQ	= 100_000
+    ' default I/O configuration
+    SCL         = 28
+    SDA         = 29
+    I2C_FREQ    = 100_000
 
     WIDTH       = 128
     HEIGHT      = 64
@@ -27,33 +27,25 @@ con
     SLAVE_ADDR_W= core.SLAVE_ADDR
     SLAVE_ADDR_R= SLAVE_ADDR_W | 1
 
-    ' touch event structure
-	touch_s(...
-        byte	event, ...		'b7..6 of X-position
-        word	x, y, ...		'b3..0 (H), b7..0 (L)
-        byte	id, ...			'b7..4 of Y-position
-        byte	weight, ...
-        byte	area)			'b7..4
-
 
 obj
 
-	i2c:	"com.i2c"
-	time:	"time"
-    core:   "core.con.ft5x26"
+    i2c:    "com.i2c"                           ' I2C engine
+    core:   "core.con.ft5x26"                   ' hw-specific constants
+    time:   "time"                              ' timekeeping methods
 
 
 var
 
-	touch_s		pointer[MAX_POINTERS]
+    touch_s     pointer[MAX_POINTERS]
 
-    byte        _invert
-    byte        _points_active
+    byte        _invert                         ' x,y coordinates invert flag
+    byte        _points_active                  ' number of active touch points
 
 
 pub start(): s
 ' Start the driver using default I/O settings
-	return startx(SCL, SDA, I2C_FREQ, WIDTH, HEIGHT)
+    return startx(SCL, SDA, I2C_FREQ, WIDTH, HEIGHT)
 
 
 pub startx(SCL_PIN, SDA_PIN, I2C_HZ, TS_WIDTH, TS_HEIGHT): s
@@ -81,23 +73,23 @@ pub startx(SCL_PIN, SDA_PIN, I2C_HZ, TS_WIDTH, TS_HEIGHT): s
 
 pub stop()
 ' Stop the driver
-	i2c.deinit()
+    i2c.deinit()
 
 
 con
 
-	' gestures
-	NO_GESTURE	= $00
-	MOVE_UP		= $10
-	MOVE_RIGHT	= $14
-	MOVE_DOWN	= $18
-	MOVE_LEFT	= $1c
-	ZOOM_IN		= $48
-	ZOOM_OUT	= $49
+    ' gestures
+    NO_GESTURE  = $00
+    MOVE_UP     = $10
+    MOVE_RIGHT  = $14
+    MOVE_DOWN   = $18
+    MOVE_LEFT   = $1c
+    ZOOM_IN     = $48
+    ZOOM_OUT    = $49
 
 pub gesture(): g
 ' Get last recognized gesture
-	return readreg(core.GEST_ID)
+    return readreg(core.GEST_ID)
 
 
 pub invert(i)
@@ -147,6 +139,8 @@ pub read_touch_events(): s | n, t, byte tmp[6]
         pointer[t].y :=         (tmp[2] & core.TOUCH_YPOS_H_BITS) << 8 | tmp[3]
         pointer[t].weight :=    tmp[4]
         pointer[t].area :=      (tmp[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
+
+    return n
 
 
 pub touch_area(t=0): a
