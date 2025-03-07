@@ -1,0 +1,101 @@
+{
+----------------------------------------------------------------------------------------------------
+    Filename:       FT5X26-Demo.spin
+    Description:    Demo of the FT5X26 touchscreen
+        * SSD1322 display
+        * x, y coordinates and touch weight display
+    Author:         Jesse Burt
+    Started:        Mar 7, 2025
+    Updated:        Mar 7, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
+}
+
+con
+
+	_clkmode	= xtal1+pll16x
+	_xinfreq	= 5_000_000
+
+
+obj
+
+    ser:    "com.serial.terminal.ansi" | SER_BAUD=115_200
+    ts:     "input.touchscreen.ft5x26" | SCL=28, SDA=29, I2C_FREQ=100_000
+    disp:   "display.oled.ssd1322" | CS=0, SCK=1, MOSI=2, DC=3, RST=4, WIDTH=128, HEIGHT=64
+    fnt:    "font.5x8"
+    time:   "time"
+
+
+pub main() | p, t
+
+    setup()
+    disp.mirror_h(true)
+    disp.mirror_v(true)
+    ts.invert(true)
+    disp.clear()
+    disp.fgcolor(15)
+
+
+    repeat
+        disp.clear()
+        p := ts.read_touch_events()             ' read all detected touch events
+        if ( p )                                ' if there are any, display feedback
+            disp.pos_xy(0, 0)
+            repeat t from 0 to p-1              ' for each point touched...
+                ' show coordinates, and weight
+                disp.printf(@"%d: x=%3.3d y=%3.3d w=%3.3d\n\r", ...
+                            t, ...
+                            ts.touch_x(t), ts.touch_y(t), ...
+                            ts.touch_weight(t) )
+                ' indicate the touched position on-screen
+                disp.circle(ts.pointer[t].x, ts.pointer[t].y, ts.pointer[t].weight/10, 7)
+        disp.show()
+
+
+pub setup()
+
+    ser.start()
+    time.msleep(30)
+    ser.clear()
+    ser.strln(@"serial started")
+
+
+    if ( disp.start() )
+        ser.strln(@"SSD1322 driver started")
+        disp.set_font(fnt.ptr(), fnt.setup())
+        disp.char_attrs(disp.TERMINAL)
+    else
+        ser.strln(@"SSD1322 driver failed to start - halting")
+        repeat
+
+
+    if ( ts.start() )
+        ser.strln(@"FT5x26 driver started")
+    else
+        ser.strln(@"FT5x26 driver failed to start - halting")
+        repeat
+
+    ' use preset settings for Newhaven 2.7" 128x64 OLED
+    disp.preset_newhaven_2p7_128x64()
+
+
+DAT
+{
+Copyright (c) 2025 Jesse Burt
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+}
+

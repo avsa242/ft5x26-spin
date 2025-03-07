@@ -113,8 +113,12 @@ pub opmode(m)
     i2c.write(m)
     i2c.stop()
 
+pub tds(): p
 
-pub read_touch_events(): s | n, t, byte tmp[6]
+    return readreg(core.TD_STATUS)
+
+
+pub read_touch_events(): s | n, t, tmp[2]
 ' Read a touchscreen structure into RAM
     _points_active := n := readreg(core.TD_STATUS)
     if ( (n == 0) or (n > MAX_POINTERS) )
@@ -133,12 +137,12 @@ pub read_touch_events(): s | n, t, byte tmp[6]
         i2c.rdblock_lsbf(@tmp, 6, i2c.NAK)
         i2c.stop()
 
-        pointer[t].event :=     (tmp[0] >> core.TOUCH_EVT_FLAG) & core.TOUCH_EVT_FLAG_BITS
-        pointer[t].x :=         (tmp[0] & core.TOUCH_XPOS_H_BITS) << 8 | tmp[1]
-        pointer[t].id :=        (tmp[2] >> core.TOUCH_ID) & core.TOUCH_ID_BITS
-        pointer[t].y :=         (tmp[2] & core.TOUCH_YPOS_H_BITS) << 8 | tmp[3]
-        pointer[t].weight :=    tmp[4]
-        pointer[t].area :=      (tmp[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
+        pointer[t].event :=     (tmp.byte[0] >> core.TOUCH_EVT_FLAG) & core.TOUCH_EVT_FLAG_BITS
+        pointer[t].x :=         (tmp.byte[0] & core.TOUCH_XPOS_H_BITS) << 8 | tmp.byte[1]
+        pointer[t].id :=        (tmp.byte[2] >> core.TOUCH_ID) & core.TOUCH_ID_BITS
+        pointer[t].y :=         (tmp.byte[2] & core.TOUCH_YPOS_H_BITS) << 8 | tmp.byte[3]
+        pointer[t].weight :=    tmp.byte[4]
+        pointer[t].area :=      (tmp.byte[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
 
     return n
 
