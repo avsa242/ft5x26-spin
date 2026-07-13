@@ -6,8 +6,8 @@
         * x, y coordinates and touch weight display
     Author:         Jesse Burt
     Started:        Mar 7, 2025
-    Updated:        Mar 7, 2025
-    Copyright (c) 2025 - See end of file for terms of use.
+    Updated:        Jul 13, 2026
+    Copyright (c) 2026 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -20,7 +20,7 @@ con
 obj
 
     ser:    "com.serial.terminal.ansi" | SER_BAUD=115_200
-    ts:     "input.touchscreen.ft5x26" | SCL=28, SDA=29, I2C_FREQ=100_000
+    ts:     "input.touchscreen.ft5x26" | SCL=28, SDA=29, RST=24, I2C_FREQ=100_000
     disp:   "display.oled.ssd1322" | CS=0, SCK=1, MOSI=2, DC=3, RST=4, WIDTH=128, HEIGHT=64
     fnt:    "font.5x8"
     time:   "time"
@@ -81,7 +81,7 @@ pub setup()
 
 DAT
 {
-Copyright (c) 2025 Jesse Burt
+Copyright (c) 2026 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

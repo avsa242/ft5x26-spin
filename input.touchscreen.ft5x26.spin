@@ -17,6 +17,7 @@ con
     SCL         = 28
     SDA         = 29
     I2C_FREQ    = 100_000
+    RST         = 24
 
     WIDTH       = 128
     HEIGHT      = 64
@@ -41,24 +42,27 @@ var
 
     byte        _invert                         ' x,y coordinates invert flag
     byte        _points_active                  ' number of active touch points
+    byte        _RST
 
 
 pub start(): s
 ' Start the driver using default I/O settings
-    return startx(SCL, SDA, I2C_FREQ, WIDTH, HEIGHT)
+    return startx(SCL, SDA, I2C_FREQ, RST, WIDTH, HEIGHT)
 
 
-pub startx(SCL_PIN, SDA_PIN, I2C_HZ, TS_WIDTH, TS_HEIGHT): s
+pub startx(SCL_PIN, SDA_PIN, I2C_HZ, RST_PIN, TS_WIDTH, TS_HEIGHT): s
 ' Start the driver using custom I/O settings and (optionally) external framebuffer
 '   SCL_PIN:            I2C Serial Clock, 0..31
 '   SDA_PIN:            I2C Serial Data, 0..31
 '   I2C_HZ:             I2C bus speed
+'   RST_PIN:            /RESET pin, 0..31 (optional; specify something else to ignore)
 '   TS_WIDTH, TS_HIGHT: touchscreen dimensions, in pixels
 '   Returns:
 '       cog ID+1 of I2C engine on success (= calling cog ID+1, if the bytecode I2C engine is used)
 '       0 on failure
     if ( lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) )
         s := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ)
+        _RST := RST_PIN
         time.usleep(core.TRST)
         set_abs_x_max(TS_WIDTH-1)
         set_abs_y_max(TS_HEIGHT-1)
@@ -145,6 +149,16 @@ pub read_touch_events(): s | n, t, tmp[2]
         pointer[t].area :=      (tmp.byte[5] >> core.TOUCH_AREA) & core.TOUCH_AREA_BITS
 
     return n
+
+
+pub reset()
+' Reset the device
+    if ( lookdown(_RST: 0..31) )
+        outa[_RST] := 1
+        dira[_RST] := 1
+        outa[_RST] := 0
+        time.msleep(2)
+        outa[_RST] := 1
 
 
 pub touch_area(t=0): a
